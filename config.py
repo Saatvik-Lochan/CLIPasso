@@ -58,6 +58,8 @@ def parse_arguments():
     parser.add_argument("--save_interval", type=int, default=10)
     parser.add_argument("--eval_interval", type=int, default=10)
     parser.add_argument("--image_scale", type=int, default=224)
+    parser.add_argument("--output_size", type=int, default=512,
+                        help="canvas size used when writing SVG outputs")
 
     # =================================
     # ======== strokes params =========

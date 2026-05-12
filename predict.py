@@ -5,8 +5,8 @@
 
 import warnings
 
-warnings.filterwarnings('ignore')
-warnings.simplefilter('ignore')
+warnings.filterwarnings("ignore")
+warnings.simplefilter("ignore")
 
 from cog import BasePredictor, Input, Path
 import subprocess as sp
@@ -51,13 +51,27 @@ class Predictor(BasePredictor):
 
     def predict(
         self,
-        target_image: Path = Input(description="Input image (square, without background)"),
-        num_strokes: int = Input(description="The number of strokes used to create the sketch, which determines the level of abstraction",default=16),
-        trials: int = Input(description="It is recommended to use 3 trials to recieve the best sketch, but it might be slower",default=3),
-        mask_object: int = Input(description="It is recommended to use images without a background, however, if your image contains a background, you can mask it out by using this flag with 1 as an argument",default=0),
-        fix_scale: int = Input(description="If your image is not squared, it might be cut off, it is recommended to use this flag with 1 as input to automatically fix the scale without cutting the image",default=0),
+        target_image: Path = Input(
+            description="Input image (square, without background)"
+        ),
+        num_strokes: int = Input(
+            description="The number of strokes used to create the sketch, which determines the level of abstraction",
+            default=16,
+        ),
+        trials: int = Input(
+            description="It is recommended to use 3 trials to recieve the best sketch, but it might be slower",
+            default=3,
+        ),
+        mask_object: int = Input(
+            description="It is recommended to use images without a background, however, if your image contains a background, you can mask it out by using this flag with 1 as an argument",
+            default=0,
+        ),
+        fix_scale: int = Input(
+            description="If your image is not squared, it might be cut off, it is recommended to use this flag with 1 as input to automatically fix the scale without cutting the image",
+            default=0,
+        ),
     ) -> Path:
-        
+
         self.num_sketches = trials
         target_image_name = os.path.basename(str(target_image))
 
@@ -85,26 +99,44 @@ class Predictor(BasePredictor):
         seeds = list(range(0, self.num_sketches * 1000, 1000))
 
         losses_all = {}
-        
+
         for seed in seeds:
             wandb_name = f"{test_name}_{num_strokes}strokes_seed{seed}"
-            sp.run(["python", "config.py", target,
-                        "--num_paths", str(num_strokes),
-                        "--output_dir", output_dir,
-                        "--wandb_name", wandb_name,
-                        "--num_iter", str(self.num_iter),
-                        "--save_interval", str(self.save_interval),
-                        "--seed", str(seed),
-                        "--use_gpu", str(int(self.use_gpu)),
-                        "--fix_scale", str(fix_scale),
-                        "--mask_object", str(mask_object),
-                        "--mask_object_attention", str(
-                            mask_object),
-                        "--display_logs", str(int(0))])
-            config_init = np.load(f"{output_dir}/{wandb_name}/config_init.npy", allow_pickle=True)[()]
+            sp.run(
+                [
+                    "python",
+                    "config.py",
+                    target,
+                    "--num_paths",
+                    str(num_strokes),
+                    "--output_dir",
+                    output_dir,
+                    "--wandb_name",
+                    wandb_name,
+                    "--num_iter",
+                    str(self.num_iter),
+                    "--save_interval",
+                    str(self.save_interval),
+                    "--seed",
+                    str(seed),
+                    "--use_gpu",
+                    str(int(self.use_gpu)),
+                    "--fix_scale",
+                    str(fix_scale),
+                    "--mask_object",
+                    str(mask_object),
+                    "--mask_object_attention",
+                    str(mask_object),
+                    "--display_logs",
+                    str(int(0)),
+                ]
+            )
+            config_init = np.load(
+                f"{output_dir}/{wandb_name}/config_init.npy", allow_pickle=True
+            )[()]
             args = Args(config_init)
             args.cog_display = True
-            
+
             final_config = vars(args)
             try:
                 configs_to_save = main(args)
@@ -118,40 +150,45 @@ class Predictor(BasePredictor):
             if args.use_wandb:
                 wandb.finish()
 
-            config = np.load(f"{output_dir}/{wandb_name}/config.npy",
-                            allow_pickle=True)[()]
-            loss_eval = np.array(config['loss_eval'])
+            config = np.load(
+                f"{output_dir}/{wandb_name}/config.npy", allow_pickle=True
+            )[()]
+            loss_eval = np.array(config["loss_eval"])
             inds = np.argsort(loss_eval)
             losses_all[wandb_name] = loss_eval[inds][0]
-            # return Path(f"{output_dir}/{wandb_name}/best_iter.svg") 
-
+            # return Path(f"{output_dir}/{wandb_name}/best_iter.svg")
 
         sorted_final = dict(sorted(losses_all.items(), key=lambda item: item[1]))
-        copyfile(f"{output_dir}/{list(sorted_final.keys())[0]}/best_iter.svg",
-                f"{output_dir}/{list(sorted_final.keys())[0]}_best.svg")
+        copyfile(
+            f"{output_dir}/{list(sorted_final.keys())[0]}/best_iter.svg",
+            f"{output_dir}/{list(sorted_final.keys())[0]}_best.svg",
+        )
         target_path = f"{abs_path}/target_images/{target_image_name}"
         svg_files = os.listdir(output_dir)
         svg_files = [f for f in svg_files if "best.svg" in f]
         svg_output_path = f"{output_dir}/{svg_files[0]}"
         sketch_res = read_svg(svg_output_path, multiply=True).cpu().numpy()
-        sketch_res = Image.fromarray((sketch_res * 255).astype('uint8'), 'RGB')
+        sketch_res = Image.fromarray((sketch_res * 255).astype("uint8"), "RGB")
         sketch_res.save(f"{abs_path}/output_sketches/sketch.png")
         return Path(svg_output_path)
 
 
-class Args():
+class Args:
     def __init__(self, config):
         for k in config.keys():
             setattr(self, k, config[k])
-        
+
 
 def load_renderer(args, target_im=None, mask=None):
-    renderer = Painter(num_strokes=args.num_paths, args=args,
-                       num_segments=args.num_segments,
-                       imsize=args.image_scale,
-                       device=args.device,
-                       target_im=target_im,
-                       mask=mask)
+    renderer = Painter(
+        num_strokes=args.num_paths,
+        args=args,
+        num_segments=args.num_segments,
+        imsize=args.image_scale,
+        device=args.device,
+        target_im=target_im,
+        mask=mask,
+    )
     renderer = renderer.to(args.device)
     return renderer
 
@@ -173,11 +210,15 @@ def get_target(args):
 
     transforms_ = []
     if target.size[0] != target.size[1]:
-        transforms_.append(transforms.Resize(
-            (args.image_scale, args.image_scale), interpolation=PIL.Image.BICUBIC))
+        transforms_.append(
+            transforms.Resize(
+                (args.image_scale, args.image_scale), interpolation=PIL.Image.BICUBIC
+            )
+        )
     else:
-        transforms_.append(transforms.Resize(
-            args.image_scale, interpolation=PIL.Image.BICUBIC))
+        transforms_.append(
+            transforms.Resize(args.image_scale, interpolation=PIL.Image.BICUBIC)
+        )
         transforms_.append(transforms.CenterCrop(args.image_scale))
     transforms_.append(transforms.ToTensor())
     data_transforms = transforms.Compose(transforms_)
@@ -211,24 +252,41 @@ def main(args):
         start = time.time()
         optimizer.zero_grad_()
         sketches = renderer.get_image().to(args.device)
-        losses_dict = loss_func(sketches, inputs.detach(
-        ), renderer.get_color_parameters(), renderer, counter, optimizer)
+        losses_dict = loss_func(
+            sketches,
+            inputs.detach(),
+            renderer.get_color_parameters(),
+            renderer,
+            counter,
+            optimizer,
+        )
         loss = sum(list(losses_dict.values()))
         loss.backward()
         optimizer.step_()
         if epoch % args.save_interval == 0:
-            utils.plot_batch(inputs, sketches, f"{args.output_dir}/jpg_logs", counter,
-                             use_wandb=args.use_wandb, title=f"iter{epoch}.jpg")
-            renderer.save_svg(
-                f"{args.output_dir}/svg_logs", f"svg_iter{epoch}")
+            utils.plot_batch(
+                inputs,
+                sketches,
+                f"{args.output_dir}/jpg_logs",
+                counter,
+                use_wandb=args.use_wandb,
+                title=f"iter{epoch}.jpg",
+            )
+            renderer.save_svg(f"{args.output_dir}/svg_logs", f"svg_iter{epoch}")
             # if args.cog_display:
             #     yield Path(f"{args.output_dir}/svg_logs/svg_iter{epoch}.svg")
 
-
         if epoch % args.eval_interval == 0:
             with torch.no_grad():
-                losses_dict_eval = loss_func(sketches, inputs, renderer.get_color_parameters(
-                ), renderer.get_points_parans(), counter, optimizer, mode="eval")
+                losses_dict_eval = loss_func(
+                    sketches,
+                    inputs,
+                    renderer.get_color_parameters(),
+                    renderer.get_points_parans(),
+                    counter,
+                    optimizer,
+                    mode="eval",
+                )
                 loss_eval = sum(list(losses_dict_eval.values()))
                 configs_to_save["loss_eval"].append(loss_eval.item())
                 for k in losses_dict_eval.keys():
@@ -237,8 +295,9 @@ def main(args):
                     configs_to_save[k].append(losses_dict_eval[k].item())
                 if args.clip_fc_loss_weight:
                     if losses_dict_eval["fc"].item() < best_fc_loss:
-                        best_fc_loss = losses_dict_eval["fc"].item(
-                        ) / args.clip_fc_loss_weight
+                        best_fc_loss = (
+                            losses_dict_eval["fc"].item() / args.clip_fc_loss_weight
+                        )
                         best_iter_fc = epoch
                 # print(
                 #     f"eval iter[{epoch}/{args.num_iter}] loss[{loss.item()}] time[{time.time() - start}]")
@@ -250,14 +309,19 @@ def main(args):
                         best_iter = epoch
                         terminate = False
                         utils.plot_batch(
-                            inputs, sketches, args.output_dir, counter, use_wandb=args.use_wandb, title="best_iter.jpg")
+                            inputs,
+                            sketches,
+                            args.output_dir,
+                            counter,
+                            use_wandb=args.use_wandb,
+                            title="best_iter.jpg",
+                        )
                         renderer.save_svg(args.output_dir, "best_iter")
 
                 if args.use_wandb:
                     wandb.run.summary["best_loss"] = best_loss
                     wandb.run.summary["best_loss_fc"] = best_fc_loss
-                    wandb_dict = {"delta": cur_delta,
-                                  "loss_eval": loss_eval.item()}
+                    wandb_dict = {"delta": cur_delta, "loss_eval": loss_eval.item()}
                     for k in losses_dict_eval.keys():
                         wandb_dict[k + "_eval"] = losses_dict_eval[k].item()
                     wandb.log(wandb_dict, step=counter)
@@ -268,10 +332,16 @@ def main(args):
                     terminate = True
 
         if counter == 0 and args.attention_init:
-            utils.plot_atten(renderer.get_attn(), renderer.get_thresh(), inputs, renderer.get_inds(),
-                             args.use_wandb, "{}/{}.jpg".format(
-                                 args.output_dir, "attention_map"),
-                             args.saliency_model, args.display_logs)
+            utils.plot_atten(
+                renderer.get_attn(),
+                renderer.get_thresh(),
+                inputs,
+                renderer.get_inds(),
+                args.use_wandb,
+                "{}/{}.jpg".format(args.output_dir, "attention_map"),
+                args.saliency_model,
+                args.display_logs,
+            )
 
         if args.use_wandb:
             wandb_dict = {"loss": loss.item(), "lr": optimizer.get_lr()}
@@ -284,16 +354,19 @@ def main(args):
     renderer.save_svg(args.output_dir, "final_svg")
     path_svg = os.path.join(args.output_dir, "best_iter.svg")
     utils.log_sketch_summary_final(
-        path_svg, args.use_wandb, args.device, best_iter, best_loss, "best total")
+        path_svg, args.use_wandb, args.device, best_iter, best_loss, "best total"
+    )
 
     return configs_to_save
 
 
 def read_svg(path_svg, multiply=False):
-    device = torch.device("cuda" if (
-        torch.cuda.is_available() and torch.cuda.device_count() > 0) else "cpu")
-    canvas_width, canvas_height, shapes, shape_groups = pydiffvg.svg_to_scene(
-        path_svg)
+    device = torch.device(
+        "cuda"
+        if (torch.cuda.is_available() and torch.cuda.device_count() > 0)
+        else "cpu"
+    )
+    canvas_width, canvas_height, shapes, shape_groups = pydiffvg.svg_to_scene(path_svg)
     if multiply:
         canvas_width *= 2
         canvas_height *= 2
@@ -302,16 +375,19 @@ def read_svg(path_svg, multiply=False):
             path.stroke_width *= 2
     _render = pydiffvg.RenderFunction.apply
     scene_args = pydiffvg.RenderFunction.serialize_scene(
-        canvas_width, canvas_height, shapes, shape_groups)
-    img = _render(canvas_width,  # width
-                  canvas_height,  # height
-                  2,   # num_samples_x
-                  2,   # num_samples_y
-                  0,   # seed
-                  None,
-                  *scene_args)
-    img = img[:, :, 3:4] * img[:, :, :3] + \
-        torch.ones(img.shape[0], img.shape[1], 3,
-                   device=device) * (1 - img[:, :, 3:4])
+        canvas_width, canvas_height, shapes, shape_groups
+    )
+    img = _render(
+        canvas_width,  # width
+        canvas_height,  # height
+        2,  # num_samples_x
+        2,  # num_samples_y
+        0,  # seed
+        None,
+        *scene_args,
+    )
+    img = img[:, :, 3:4] * img[:, :, :3] + torch.ones(
+        img.shape[0], img.shape[1], 3, device=device
+    ) * (1 - img[:, :, 3:4])
     img = img[:, :, :3]
     return img

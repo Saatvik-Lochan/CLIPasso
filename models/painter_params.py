@@ -188,7 +188,23 @@ class Painter(torch.nn.Module):
         return self.color_vars
         
     def save_svg(self, output_dir, name):
-        pydiffvg.save_svg('{}/{}.svg'.format(output_dir, name), self.canvas_width, self.canvas_height, self.shapes, self.shape_groups)
+        output_size = getattr(self.args, "output_size", self.canvas_width)
+        scale_x = output_size / self.canvas_width
+        scale_y = output_size / self.canvas_height
+
+        original_points = [path.points.data.clone() for path in self.shapes]
+        original_widths = [path.stroke_width.data.clone() for path in self.shapes]
+        try:
+            for path in self.shapes:
+                path.points.data[:, 0] *= scale_x
+                path.points.data[:, 1] *= scale_y
+                # pydiffvg serializes Path.stroke_width as SVG stroke-width * 2.
+                path.stroke_width.data.fill_(self.width / 2)
+            pydiffvg.save_svg('{}/{}.svg'.format(output_dir, name), output_size, output_size, self.shapes, self.shape_groups)
+        finally:
+            for path, points, width in zip(self.shapes, original_points, original_widths):
+                path.points.data.copy_(points)
+                path.stroke_width.data.copy_(width)
 
 
     def dino_attn(self):
